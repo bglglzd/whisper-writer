@@ -1,6 +1,9 @@
 import yaml
 import os
 
+_DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.yaml')
+
+
 class ConfigManager:
     _instance = None
 
@@ -94,7 +97,7 @@ class ConfigManager:
             config[category] = extract_value(settings)
         return config
 
-    def load_user_config(self, config_path=os.path.join('src', 'config.yaml')):
+    def load_user_config(self, config_path=_DEFAULT_CONFIG_PATH):
         """Load user configuration and merge with default config."""
         def deep_update(source, overrides):
             for key, value in overrides.items():
@@ -112,7 +115,7 @@ class ConfigManager:
                 print("Error in configuration file. Using default configuration.")
 
     @classmethod
-    def save_config(cls, config_path=os.path.join('src', 'config.yaml')):
+    def save_config(cls, config_path=_DEFAULT_CONFIG_PATH):
         """Save the current configuration to a YAML file."""
         if cls._instance is None:
             raise RuntimeError("ConfigManager not initialized")
@@ -132,8 +135,7 @@ class ConfigManager:
     @classmethod
     def config_file_exists(cls):
         """Check if a valid config file exists."""
-        config_path = os.path.join('src', 'config.yaml')
-        return os.path.isfile(config_path)
+        return os.path.isfile(_DEFAULT_CONFIG_PATH)
 
     @classmethod
     def console_print(cls, message):

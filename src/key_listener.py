@@ -663,14 +663,6 @@ class EvdevBackend(InputBackend):
             self.evdev.ecodes.KEY_DOT: KeyCode.PERIOD,
             self.evdev.ecodes.KEY_SLASH: KeyCode.SLASH,
 
-            # Media keys
-            self.evdev.ecodes.KEY_MUTE: KeyCode.MUTE,
-            self.evdev.ecodes.KEY_VOLUMEDOWN: KeyCode.VOLUME_DOWN,
-            self.evdev.ecodes.KEY_VOLUMEUP: KeyCode.VOLUME_UP,
-            self.evdev.ecodes.KEY_PLAYPAUSE: KeyCode.PLAY_PAUSE,
-            self.evdev.ecodes.KEY_NEXTSONG: KeyCode.NEXT_TRACK,
-            self.evdev.ecodes.KEY_PREVIOUSSONG: KeyCode.PREV_TRACK,
-
             # Additional function keys (if needed)
             self.evdev.ecodes.KEY_F13: KeyCode.F13,
             self.evdev.ecodes.KEY_F14: KeyCode.F14,
@@ -788,27 +780,30 @@ class PynputBackend(InputBackend):
             self.mouse_listener.stop()
             self.mouse_listener = None
 
-    def _translate_key_event(self, native_event) -> tuple[KeyCode, InputEvent]:
+    def _translate_key_event(self, native_event) -> tuple[KeyCode | None, InputEvent]:
         """Translate a pynput event to our internal event representation."""
         pynput_key, is_press = native_event
-        key_code = self.key_map.get(pynput_key, KeyCode.SPACE)
+        key_code = self.key_map.get(pynput_key)
         event_type = InputEvent.KEY_PRESS if is_press else InputEvent.KEY_RELEASE
         return key_code, event_type
 
     def _on_keyboard_press(self, key):
         """Handle keyboard press events."""
-        translated_event = self._translate_key_event((key, True))
-        self.on_input_event(translated_event)
+        key_code, event_type = self._translate_key_event((key, True))
+        if key_code is not None:
+            self.on_input_event((key_code, event_type))
 
     def _on_keyboard_release(self, key):
         """Handle keyboard release events."""
-        translated_event = self._translate_key_event((key, False))
-        self.on_input_event(translated_event)
+        key_code, event_type = self._translate_key_event((key, False))
+        if key_code is not None:
+            self.on_input_event((key_code, event_type))
 
     def _on_mouse_click(self, x, y, button, pressed):
         """Handle mouse click events."""
-        translated_event = self._translate_key_event((button, pressed))
-        self.on_input_event(translated_event)
+        key_code, event_type = self._translate_key_event((button, pressed))
+        if key_code is not None:
+            self.on_input_event((key_code, event_type))
 
     def _create_key_map(self):
         """Create a mapping from pynput keys to our internal KeyCode enum."""
