@@ -12,7 +12,7 @@ for nvidia_lib in ['nvidia\\cublas\\bin', 'nvidia\\cudnn\\bin']:
             if hasattr(os, 'add_dll_directory'):
                 os.add_dll_directory(dll_path)
 
-# IMPORTANT: Load CUDA model BEFORE PyQt5 to avoid segfault
+# IMPORTANT: Load CUDA model BEFORE importing Qt to avoid segfault
 from utils import ConfigManager
 from transcription import create_local_model
 
@@ -21,16 +21,16 @@ if __name__ == '__main__':
     ConfigManager.initialize()
     model_options = ConfigManager.get_config_section('model_options')
     if not model_options.get('use_api'):
-        print('Pre-loading Whisper model (before PyQt5)...')
+        print('Pre-loading Whisper model (before Qt)...')
         _preloaded_model = create_local_model()
         print('Model loaded.')
 
 import soundfile as sf
 import sounddevice as sd
 from pynput.keyboard import Controller
-from PyQt5.QtCore import QObject, QProcess
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QAction, QMessageBox
+from PySide6.QtCore import QObject, QProcess
+from PySide6.QtGui import QIcon, QAction
+from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QMessageBox
 
 from key_listener import KeyListener
 from result_thread import ResultThread
@@ -232,7 +232,7 @@ class WhisperWriterApp(QObject):
         """
         Start the application.
         """
-        sys.exit(self.app.exec_())
+        sys.exit(self.app.exec())
 
 
 if __name__ == '__main__':

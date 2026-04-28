@@ -1,6 +1,6 @@
-from PyQt5.QtCore import Qt, QRectF
-from PyQt5.QtGui import QPainter, QBrush, QColor, QFont, QPainterPath, QGuiApplication
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QMainWindow
+from PySide6.QtCore import Qt, QRectF
+from PySide6.QtGui import QPainter, QBrush, QColor, QFont, QPainterPath, QGuiApplication
+from PySide6.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QMainWindow
 
 
 class BaseWindow(QMainWindow):
@@ -87,7 +87,7 @@ class BaseWindow(QMainWindow):
         """
         if event.button() == Qt.LeftButton:
             self.is_dragging = True
-            self.start_position = event.globalPos() - self.frameGeometry().topLeft()
+            self.start_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
             event.accept()
 
     def mouseMoveEvent(self, event):
@@ -95,7 +95,7 @@ class BaseWindow(QMainWindow):
         Move the window when dragging.
         """
         if Qt.LeftButton and self.is_dragging:
-            self.move(event.globalPos() - self.start_position)
+            self.move(event.globalPosition().toPoint() - self.start_position)
             event.accept()
 
     def mouseReleaseEvent(self, event):
