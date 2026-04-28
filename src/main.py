@@ -33,37 +33,159 @@ from PySide6.QtGui import QIcon, QAction
 from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QMessageBox
 
 GLOBAL_QSS = """
+/* ---------- Apple-ish light theme ---------- */
+QMainWindow, QDialog, QMessageBox {
+    background-color: #f5f5f7;
+}
+
+QWidget {
+    color: #1d1d1f;
+    font-family: "Segoe UI Variable", "Segoe UI", "SF Pro Text", sans-serif;
+    font-size: 10pt;
+}
+
+/* Form labels and helper text */
+QLabel {
+    color: #1d1d1f;
+    background: transparent;
+}
+QLabel[secondary="true"] {
+    color: #6e6e73;
+    font-size: 9pt;
+}
+QLabel[section_header="true"] {
+    color: #6e6e73;
+    font-size: 9pt;
+    font-weight: 600;
+    letter-spacing: 1px;
+    padding-top: 6px;
+    padding-bottom: 2px;
+}
+
+QFrame[separator="true"] {
+    color: #d2d2d7;
+    background-color: #d2d2d7;
+    max-height: 1px;
+    border: none;
+}
+
+/* Tab bar — segmented-control feel */
+QTabWidget::pane {
+    border: 1px solid #d2d2d7;
+    border-radius: 10px;
+    background: #ffffff;
+    top: -1px;
+}
+QTabBar {
+    qproperty-drawBase: 0;
+    background: transparent;
+}
+QTabBar::tab {
+    background: transparent;
+    color: #6e6e73;
+    padding: 8px 18px;
+    border: 1px solid transparent;
+    margin: 0 2px;
+    min-width: 80px;
+    font-weight: 500;
+}
+QTabBar::tab:selected {
+    background: #ffffff;
+    color: #1d1d1f;
+    border: 1px solid #d2d2d7;
+    border-bottom: 1px solid #ffffff;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+}
+QTabBar::tab:hover:!selected {
+    color: #1d1d1f;
+}
+
+/* Primary buttons (Apple system blue) */
 QPushButton {
-    background-color: #4a90e2;
+    background-color: #0071e3;
     color: white;
     border: none;
-    border-radius: 6px;
-    padding: 6px 14px;
+    border-radius: 8px;
+    padding: 7px 16px;
     font-weight: 500;
-    min-height: 22px;
+    min-height: 24px;
 }
-QPushButton:hover { background-color: #5aa0f2; }
-QPushButton:pressed { background-color: #3a80d2; }
-QPushButton:disabled { background-color: #b0b0b0; color: #f0f0f0; }
+QPushButton:hover { background-color: #0077ed; }
+QPushButton:pressed { background-color: #006edb; }
+QPushButton:disabled { background-color: #aeaeb2; color: #f5f5f7; }
+QPushButton:default { background-color: #0071e3; }
+
+/* Secondary buttons (Discard, Browse, Settings) */
+QPushButton[secondary="true"] {
+    background-color: #ffffff;
+    color: #1d1d1f;
+    border: 1px solid #d2d2d7;
+}
+QPushButton[secondary="true"]:hover {
+    background-color: #fafafa;
+    border-color: #c0c0c5;
+}
+QPushButton[secondary="true"]:pressed {
+    background-color: #f0f0f2;
+}
+
+/* Inputs */
 QLineEdit, QComboBox {
-    border: 1px solid #cccccc;
+    background-color: #ffffff;
+    border: 1px solid #d2d2d7;
+    border-radius: 6px;
+    padding: 5px 9px;
+    color: #1d1d1f;
+    min-height: 22px;
+    selection-background-color: #0071e3;
+    selection-color: white;
+}
+QLineEdit:focus, QComboBox:focus {
+    border: 1px solid #0071e3;
+}
+QLineEdit:disabled, QComboBox:disabled {
+    background-color: #f5f5f7;
+    color: #8e8e93;
+}
+QComboBox::drop-down {
+    border: none;
+    width: 22px;
+}
+QComboBox QAbstractItemView {
+    background: #ffffff;
+    border: 1px solid #d2d2d7;
+    border-radius: 6px;
+    selection-background-color: #0071e3;
+    selection-color: #ffffff;
+    padding: 4px 0;
+}
+
+/* Checkboxes — keep native indicator (Fusion paints a clean one) */
+QCheckBox {
+    spacing: 8px;
+    color: #1d1d1f;
+}
+
+/* Help / icon-only buttons in form rows */
+QToolButton {
+    background: transparent;
+    border: none;
     border-radius: 4px;
-    padding: 4px 8px;
-    background-color: white;
-    min-height: 18px;
+    padding: 2px;
 }
-QLineEdit:focus, QComboBox:focus { border-color: #4a90e2; }
-QCheckBox { spacing: 8px; }
-QTabBar::tab {
-    padding: 6px 14px;
-    border: 1px solid #d0d0d0;
-    border-bottom: none;
-    border-top-left-radius: 4px;
-    border-top-right-radius: 4px;
-    background-color: #ececec;
+QToolButton:hover {
+    background-color: #ebebed;
 }
-QTabBar::tab:selected { background-color: white; }
-QTabBar::tab:hover { background-color: #f5f5f5; }
+
+/* Tooltips */
+QToolTip {
+    background-color: #1d1d1f;
+    color: #ffffff;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 6px;
+}
 """
 
 from key_listener import KeyListener
