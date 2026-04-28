@@ -1,11 +1,21 @@
 import io
 import os
+import sys
 import numpy as np
 import soundfile as sf
 from faster_whisper import WhisperModel
 from openai import OpenAI
 
 from utils import ConfigManager
+
+# When packaged with PyInstaller (`sys._MEIPASS` is set), the bundle ships
+# without NVIDIA CUDA DLLs (cublas, cudnn, …). ctranslate2 will happily
+# *create* a CUDA model in that environment but then crash at the first
+# inference call with "Library cublas64_12.dll is not found". So in a
+# frozen build we ignore the user's `device`/`compute_type` config and
+# force a safe CPU configuration. Source-checkout users with a working
+# CUDA install are unaffected.
+_FROZEN_CPU_ONLY = hasattr(sys, '_MEIPASS')
 
 _openai_client = None
 _openai_client_key = None
@@ -32,7 +42,17 @@ def create_local_model():
     compute_type = local_model_options['compute_type']
     model_path = local_model_options.get('model_path')
 
-    if compute_type == 'int8':
+    if _FROZEN_CPU_ONLY:
+        device = 'cpu'
+        # `default` resolves to int16 on CPU. Any CUDA-only compute type
+        # (float16, bfloat16) would error out at inference, so coerce
+        # those to int8 — fast and safe on CPU.
+        if compute_type in ('float16', 'bfloat16'):
+            compute_type = 'int8'
+        ConfigManager.console_print(
+            f'Frozen build: forcing CPU. device=cpu compute_type={compute_type}'
+        )
+    elif compute_type == 'int8':
         device = 'cpu'
         ConfigManager.console_print('Using int8 quantization, forcing CPU usage.')
     else:
