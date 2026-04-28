@@ -1,16 +1,21 @@
 import os
 import sys
 
-# Redirect stdout/stderr to a log file when running frozen (no console).
-# Truncated on each launch so the file always shows the current session.
+# Redirect stdout/stderr to a log file. In a frozen bundle there's no console
+# to print to; in source mode we usually launch via pythonw / start.vbs which
+# also has no console. Truncated on each launch so the file always reflects
+# the current session.
 if hasattr(sys, '_MEIPASS'):
-    try:
-        _log_path = os.path.join(os.path.dirname(sys.executable), 'whisper-writer.log')
-        _log_file = open(_log_path, 'w', encoding='utf-8', buffering=1)
-        sys.stdout = _log_file
-        sys.stderr = _log_file
-    except Exception:
-        pass
+    _log_dir = os.path.dirname(sys.executable)
+else:
+    _log_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+try:
+    _log_path = os.path.join(_log_dir, 'whisper-writer.log')
+    _log_file = open(_log_path, 'w', encoding='utf-8', buffering=1)
+    sys.stdout = _log_file
+    sys.stderr = _log_file
+except Exception:
+    pass
 
 # Add NVIDIA CUDA DLLs to PATH and DLL directories before any CUDA imports
 _project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
