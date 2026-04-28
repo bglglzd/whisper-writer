@@ -1,6 +1,30 @@
 import os
 import sys
-import time
+
+# Add NVIDIA CUDA DLLs to PATH and DLL directories before any CUDA imports
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+for nvidia_lib in ['nvidia\\cublas\\bin', 'nvidia\\cudnn\\bin']:
+    for base in [os.path.join(sys.prefix, 'Lib', 'site-packages'),
+                 os.path.join(_project_root, 'venv', 'Lib', 'site-packages')]:
+        dll_path = os.path.abspath(os.path.join(base, nvidia_lib))
+        if os.path.isdir(dll_path):
+            os.environ['PATH'] = dll_path + os.pathsep + os.environ.get('PATH', '')
+            if hasattr(os, 'add_dll_directory'):
+                os.add_dll_directory(dll_path)
+
+# IMPORTANT: Load CUDA model BEFORE PyQt5 to avoid segfault
+from utils import ConfigManager
+from transcription import create_local_model
+
+_preloaded_model = None
+if __name__ == '__main__':
+    ConfigManager.initialize()
+    model_options = ConfigManager.get_config_section('model_options')
+    if not model_options.get('use_api'):
+        print('Pre-loading Whisper model (before PyQt5)...')
+        _preloaded_model = create_local_model()
+        print('Model loaded.')
+
 from audioplayer import AudioPlayer
 from pynput.keyboard import Controller
 from PyQt5.QtCore import QObject, QProcess
@@ -12,17 +36,16 @@ from result_thread import ResultThread
 from ui.main_window import MainWindow
 from ui.settings_window import SettingsWindow
 from ui.status_window import StatusWindow
-from transcription import create_local_model
 from input_simulation import InputSimulator
-from utils import ConfigManager
 
 
 class WhisperWriterApp(QObject):
-    def __init__(self):
+    def __init__(self, preloaded_model=None):
         """
         Initialize the application, opening settings window if no configuration file is found.
         """
         super().__init__()
+        self.preloaded_model = preloaded_model
         self.app = QApplication(sys.argv)
         self.app.setWindowIcon(QIcon(os.path.join('assets', 'ww-logo.png')))
 
@@ -49,8 +72,10 @@ class WhisperWriterApp(QObject):
         self.key_listener.add_callback("on_deactivate", self.on_deactivation)
 
         model_options = ConfigManager.get_config_section('model_options')
-        model_path = model_options.get('local', {}).get('model_path')
-        self.local_model = create_local_model() if not model_options.get('use_api') else None
+        if self.preloaded_model:
+            self.local_model = self.preloaded_model
+        else:
+            self.local_model = create_local_model() if not model_options.get('use_api') else None
 
         self.result_thread = None
 
@@ -89,6 +114,7 @@ class WhisperWriterApp(QObject):
         self.tray_icon.show()
 
     def cleanup(self):
+        self._cleanup_result_thread()
         if self.key_listener:
             self.key_listener.stop()
         if self.input_simulator:
@@ -141,12 +167,26 @@ class WhisperWriterApp(QObject):
             if self.result_thread and self.result_thread.isRunning():
                 self.result_thread.stop_recording()
 
+    def _cleanup_result_thread(self):
+        """Clean up the previous result thread to prevent thread/memory leaks."""
+        if self.result_thread is not None:
+            if self.result_thread.isRunning():
+                self.result_thread.stop()
+            self.result_thread.statusSignal.disconnect()
+            self.result_thread.resultSignal.disconnect()
+            if not ConfigManager.get_config_value('misc', 'hide_status_window'):
+                self.status_window.closeSignal.disconnect(self.stop_result_thread)
+            self.result_thread.deleteLater()
+            self.result_thread = None
+
     def start_result_thread(self):
         """
         Start the result thread to record audio and transcribe it.
         """
         if self.result_thread and self.result_thread.isRunning():
             return
+
+        self._cleanup_result_thread()
 
         self.result_thread = ResultThread(self.local_model)
         if not ConfigManager.get_config_value('misc', 'hide_status_window'):
@@ -184,5 +224,5 @@ class WhisperWriterApp(QObject):
 
 
 if __name__ == '__main__':
-    app = WhisperWriterApp()
+    app = WhisperWriterApp(preloaded_model=_preloaded_model)
     app.run()
