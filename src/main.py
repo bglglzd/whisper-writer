@@ -130,14 +130,14 @@ class WhisperWriterApp(QObject):
     def restart_app(self):
         """Restart the application to apply the new settings."""
         self.cleanup()
-        QApplication.quit()
         QProcess.startDetached(sys.executable, sys.argv)
+        QApplication.quit()
 
     def on_settings_closed(self):
         """
         If settings is closed without saving on first run, initialize the components with default values.
         """
-        if not os.path.exists(os.path.join('src', 'config.yaml')):
+        if not ConfigManager.config_file_exists():
             QMessageBox.information(
                 self.settings_window,
                 'Using Default Values',
