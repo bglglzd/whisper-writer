@@ -55,17 +55,17 @@ model_options:
         - large-v2
         - large-v3
     device:
-      value: auto
+      value: cpu
       type: str
-      description: "The device to run the local Whisper model on. Use 'cuda' for NVIDIA GPUs, 'cpu' for CPU-only processing, or 'auto' to let the system automatically choose the best available device."
+      description: "The device to run the local Whisper model on. The public release is CPU-only — keep this on 'cpu'. Use 'cuda' only if running from source with NVIDIA libs installed."
       options:
         - auto
         - cuda
         - cpu
     compute_type:
-      value: default
+      value: int8
       type: str
-      description: "The compute type to use for the local Whisper model."
+      description: "The compute type to use for the local Whisper model. int8 is fastest on CPU."
       options:
         - default
         - float32
@@ -99,9 +99,9 @@ recording_options:
       - evdev
       - pynput
   recording_mode:
-    value: continuous
+    value: voice_activity_detection
     type: str
-    description: "The recording mode to use. Options include continuous (auto-restart recording after pause in speech until activation key is pressed again), voice_activity_detection (stop recording after pause in speech), press_to_toggle (stop recording when activation key is pressed again), hold_to_record (stop recording when activation key is released)."
+    description: "The recording mode to use. Options: voice_activity_detection (stop recording after a pause in speech — recommended), continuous (auto-restart recording after every pause until you press the hotkey again), press_to_toggle (stop only when you press the hotkey again), hold_to_record (record only while the hotkey is held down)."
     options:
       - continuous
       - voice_activity_detection
