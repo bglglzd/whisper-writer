@@ -663,14 +663,6 @@ class EvdevBackend(InputBackend):
             self.evdev.ecodes.KEY_DOT: KeyCode.PERIOD,
             self.evdev.ecodes.KEY_SLASH: KeyCode.SLASH,
 
-            # Media keys
-            self.evdev.ecodes.KEY_MUTE: KeyCode.MUTE,
-            self.evdev.ecodes.KEY_VOLUMEDOWN: KeyCode.VOLUME_DOWN,
-            self.evdev.ecodes.KEY_VOLUMEUP: KeyCode.VOLUME_UP,
-            self.evdev.ecodes.KEY_PLAYPAUSE: KeyCode.PLAY_PAUSE,
-            self.evdev.ecodes.KEY_NEXTSONG: KeyCode.NEXT_TRACK,
-            self.evdev.ecodes.KEY_PREVIOUSSONG: KeyCode.PREV_TRACK,
-
             # Additional function keys (if needed)
             self.evdev.ecodes.KEY_F13: KeyCode.F13,
             self.evdev.ecodes.KEY_F14: KeyCode.F14,
