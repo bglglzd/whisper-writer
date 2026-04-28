@@ -32,6 +32,40 @@ from PySide6.QtCore import QObject, QProcess
 from PySide6.QtGui import QIcon, QAction
 from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QMessageBox
 
+GLOBAL_QSS = """
+QPushButton {
+    background-color: #4a90e2;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-weight: 500;
+    min-height: 22px;
+}
+QPushButton:hover { background-color: #5aa0f2; }
+QPushButton:pressed { background-color: #3a80d2; }
+QPushButton:disabled { background-color: #b0b0b0; color: #f0f0f0; }
+QLineEdit, QComboBox {
+    border: 1px solid #cccccc;
+    border-radius: 4px;
+    padding: 4px 8px;
+    background-color: white;
+    min-height: 18px;
+}
+QLineEdit:focus, QComboBox:focus { border-color: #4a90e2; }
+QCheckBox { spacing: 8px; }
+QTabBar::tab {
+    padding: 6px 14px;
+    border: 1px solid #d0d0d0;
+    border-bottom: none;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    background-color: #ececec;
+}
+QTabBar::tab:selected { background-color: white; }
+QTabBar::tab:hover { background-color: #f5f5f5; }
+"""
+
 from key_listener import KeyListener
 from result_thread import ResultThread
 from ui.main_window import MainWindow
@@ -48,6 +82,8 @@ class WhisperWriterApp(QObject):
         super().__init__()
         self.preloaded_model = preloaded_model
         self.app = QApplication(sys.argv)
+        self.app.setStyle('Fusion')
+        self.app.setStyleSheet(GLOBAL_QSS)
         self.app.setWindowIcon(QIcon(os.path.join('assets', 'ww-logo.png')))
 
         ConfigManager.initialize()
