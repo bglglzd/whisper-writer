@@ -1,6 +1,17 @@
 import os
 import sys
 
+# Redirect stdout/stderr to a log file when running frozen (no console).
+# Truncated on each launch so the file always shows the current session.
+if hasattr(sys, '_MEIPASS'):
+    try:
+        _log_path = os.path.join(os.path.dirname(sys.executable), 'whisper-writer.log')
+        _log_file = open(_log_path, 'w', encoding='utf-8', buffering=1)
+        sys.stdout = _log_file
+        sys.stderr = _log_file
+    except Exception:
+        pass
+
 # Add NVIDIA CUDA DLLs to PATH and DLL directories before any CUDA imports
 _project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 for nvidia_lib in ['nvidia\\cublas\\bin', 'nvidia\\cudnn\\bin']:
@@ -307,15 +318,17 @@ class WhisperWriterApp(QObject):
     def on_activation(self):
         """
         Called when the activation key combination is pressed.
-        """
-        if self.result_thread and self.result_thread.isRunning():
-            recording_mode = ConfigManager.get_config_value('recording_options', 'recording_mode')
-            if recording_mode == 'press_to_toggle':
-                self.result_thread.stop_recording()
-            elif recording_mode == 'continuous':
-                self.stop_result_thread()
-            return
 
+        First press starts recording. Second press stops recording and
+        triggers transcription — whether the recording mode is
+        `press_to_toggle` or `continuous`. (The original `continuous`
+        path called `stop_result_thread()`, which discarded the audio
+        instead of transcribing it.)
+        """
+        ConfigManager.console_print('Hotkey pressed')
+        if self.result_thread and self.result_thread.isRunning():
+            self.result_thread.stop_recording()
+            return
         self.start_result_thread()
 
     def on_deactivation(self):

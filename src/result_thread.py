@@ -16,7 +16,7 @@ except ImportError:
     _HAS_WEBRTCVAD = False
 
 
-def _frame_is_speech_rms(frame_int16, threshold=500):
+def _frame_is_speech_rms(frame_int16, threshold=300):
     """
     Cheap, dependency-free silence detector: returns True if the RMS
     amplitude of an int16 audio frame is above `threshold`.
@@ -24,7 +24,9 @@ def _frame_is_speech_rms(frame_int16, threshold=500):
     Used as a fallback when `webrtcvad` is not available (e.g. in the
     public CPU-only release where webrtcvad's PyInstaller hook is broken).
     Slightly less robust at rejecting non-speech noise than WebRTC VAD,
-    but adequate for typical desktop microphone use.
+    but adequate for typical desktop microphone use. Threshold 300 was
+    picked empirically: typical desktop-mic conversation rates 800-3000
+    RMS, room hum 50-150, so 300 lets quieter speech still register.
     """
     if frame_int16.size == 0:
         return False
