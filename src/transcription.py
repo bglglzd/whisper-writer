@@ -7,6 +7,22 @@ from openai import OpenAI
 
 from utils import ConfigManager
 
+_openai_client = None
+_openai_client_key = None
+
+
+def _get_openai_client():
+    """Return a cached OpenAI client, rebuilding it if api_key or base_url changed."""
+    global _openai_client, _openai_client_key
+    api_key = os.getenv('OPENAI_API_KEY') or None
+    base_url = ConfigManager.get_config_value('model_options', 'api', 'base_url') or 'https://api.openai.com/v1'
+    cache_key = (api_key, base_url)
+    if _openai_client is None or _openai_client_key != cache_key:
+        _openai_client = OpenAI(api_key=api_key, base_url=base_url)
+        _openai_client_key = cache_key
+    return _openai_client
+
+
 def create_local_model():
     """
     Create a local model using the faster-whisper library.
@@ -61,17 +77,14 @@ def transcribe_local(audio_data, local_model=None):
                                       condition_on_previous_text=model_options['local']['condition_on_previous_text'],
                                       temperature=model_options['common']['temperature'],
                                       vad_filter=model_options['local']['vad_filter'],)
-    return ''.join([segment.text for segment in list(response[0])])
+    return ''.join(segment.text for segment in response[0])
 
 def transcribe_api(audio_data):
     """
     Transcribe an audio file using the OpenAI API.
     """
     model_options = ConfigManager.get_config_section('model_options')
-    client = OpenAI(
-        api_key=os.getenv('OPENAI_API_KEY') or None,
-        base_url=model_options['api']['base_url'] or 'https://api.openai.com/v1'
-    )
+    client = _get_openai_client()
 
     # Convert numpy array to WAV file
     byte_io = io.BytesIO()
