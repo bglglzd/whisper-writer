@@ -25,7 +25,8 @@ if __name__ == '__main__':
         _preloaded_model = create_local_model()
         print('Model loaded.')
 
-from audioplayer import AudioPlayer
+import soundfile as sf
+import sounddevice as sd
 from pynput.keyboard import Controller
 from PyQt5.QtCore import QObject, QProcess
 from PyQt5.QtGui import QIcon
@@ -202,6 +203,17 @@ class WhisperWriterApp(QObject):
         if self.result_thread and self.result_thread.isRunning():
             self.result_thread.stop()
 
+    def _play_completion_beep(self):
+        """Play the completion beep using sounddevice (already a dep, no extra install)."""
+        try:
+            beep_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                    'assets', 'beep.wav')
+            data, sample_rate = sf.read(beep_path)
+            sd.play(data, sample_rate)
+            sd.wait()
+        except Exception as e:
+            ConfigManager.console_print(f'Could not play completion beep: {e}')
+
     def on_transcription_complete(self, result):
         """
         When the transcription is complete, type the result and start listening for the activation key again.
@@ -209,7 +221,7 @@ class WhisperWriterApp(QObject):
         self.input_simulator.typewrite(result)
 
         if ConfigManager.get_config_value('misc', 'noise_on_completion'):
-            AudioPlayer(os.path.join('assets', 'beep.wav')).play(block=True)
+            self._play_completion_beep()
 
         if ConfigManager.get_config_value('recording_options', 'recording_mode') == 'continuous':
             self.start_result_thread()
