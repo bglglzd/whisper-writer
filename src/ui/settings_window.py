@@ -23,6 +23,7 @@ class SettingsWindow(BaseWindow):
     def __init__(self):
         super().__init__('WhisperWriter — Settings', 720, 600)
         self.schema = ConfigManager.get_schema()
+        self._skip_close_confirm = False
         self._init_settings_ui()
 
     def _init_settings_ui(self):
@@ -227,6 +228,7 @@ class SettingsWindow(BaseWindow):
         ConfigManager.set_config_value(None, 'model_options', 'api', 'api_key')
         ConfigManager.save_config()
         QMessageBox.information(self, 'Settings saved', 'Settings have been saved. The application will now restart.')
+        self._skip_close_confirm = True
         self.settings_saved.emit()
         self.close()
 
@@ -304,6 +306,10 @@ class SettingsWindow(BaseWindow):
                             func(widget, category, sub_category, key, meta)
 
     def closeEvent(self, event):
+        if self._skip_close_confirm:
+            self.settings_closed.emit()
+            super().closeEvent(event)
+            return
         reply = QMessageBox.question(
             self,
             'Close without saving?',
