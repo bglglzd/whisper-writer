@@ -94,7 +94,7 @@ class BaseWindow(QMainWindow):
         """
         Move the window when dragging.
         """
-        if Qt.LeftButton and self.is_dragging:
+        if self.is_dragging:
             self.move(event.globalPosition().toPoint() - self.start_position)
             event.accept()
 
