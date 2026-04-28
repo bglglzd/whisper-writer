@@ -1,7 +1,35 @@
 import yaml
 import os
+import sys
 
-_DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.yaml')
+
+def resource_path(relative_path):
+    """
+    Resolve a path to a bundled (read-only) resource.
+
+    In a PyInstaller frozen bundle, resources live under `sys._MEIPASS`.
+    In a normal source checkout, they live under the project root
+    (one level above this src/ directory).
+    """
+    base = getattr(sys, '_MEIPASS', None)
+    if base is None:
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, relative_path)
+
+
+def _user_config_dir():
+    """
+    Return the directory where the writable user config lives.
+
+    Frozen bundle: sit next to the executable (portable mode — config
+    travels with the unpacked app folder). Dev: alongside utils.py.
+    """
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+_DEFAULT_CONFIG_PATH = os.path.join(_user_config_dir(), 'config.yaml')
 
 
 class ConfigManager:
@@ -75,8 +103,7 @@ class ConfigManager:
     def load_config_schema(schema_path=None):
         """Load the configuration schema from a YAML file."""
         if schema_path is None:
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            schema_path = os.path.join(base_dir, 'config_schema.yaml')
+            schema_path = resource_path(os.path.join('src', 'config_schema.yaml'))
 
         with open(schema_path, 'r') as file:
             schema = yaml.safe_load(file)
