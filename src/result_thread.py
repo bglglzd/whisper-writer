@@ -5,7 +5,7 @@ import sounddevice as sd
 import tempfile
 import wave
 import webrtcvad
-from PyQt5.QtCore import QThread, QMutex, pyqtSignal
+from PySide6.QtCore import QThread, QMutex, Signal
 from collections import deque
 from threading import Event
 
@@ -29,8 +29,8 @@ class ResultThread(QThread):
         resultSignal: Emits the transcription result
     """
 
-    statusSignal = pyqtSignal(str)
-    resultSignal = pyqtSignal(str)
+    statusSignal = Signal(str)
+    resultSignal = Signal(str)
 
     def __init__(self, local_model=None):
         """

@@ -1,16 +1,16 @@
 import os
 import sys
-from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QApplication, QPushButton, QHBoxLayout
-from PyQt5.QtCore import pyqtSignal
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import QApplication, QPushButton, QHBoxLayout
+from PySide6.QtCore import Signal
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from ui.base_window import BaseWindow
 
 class MainWindow(BaseWindow):
-    openSettings = pyqtSignal()
-    startListening = pyqtSignal()
-    closeApp = pyqtSignal()
+    openSettings = Signal()
+    startListening = Signal()
+    closeApp = Signal()
 
     def __init__(self):
         """
@@ -60,4 +60,4 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())

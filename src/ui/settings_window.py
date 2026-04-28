@@ -1,11 +1,11 @@
 import os
 import sys
 from dotenv import set_key, load_dotenv
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QComboBox, QCheckBox,
     QMessageBox, QTabWidget, QWidget, QSizePolicy, QSpacerItem, QToolButton, QStyle, QFileDialog
 )
-from PyQt5.QtCore import Qt, QCoreApplication, QProcess, pyqtSignal
+from PySide6.QtCore import Qt, QCoreApplication, QProcess, Signal
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from ui.base_window import BaseWindow
@@ -14,8 +14,8 @@ from utils import ConfigManager
 load_dotenv()
 
 class SettingsWindow(BaseWindow):
-    settings_closed = pyqtSignal()
-    settings_saved = pyqtSignal()
+    settings_closed = Signal()
+    settings_saved = Signal()
 
     def __init__(self):
         """Initialize the settings window."""
