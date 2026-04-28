@@ -13,7 +13,7 @@ for nvidia_lib in ['nvidia\\cublas\\bin', 'nvidia\\cudnn\\bin']:
                 os.add_dll_directory(dll_path)
 
 # IMPORTANT: Load CUDA model BEFORE importing Qt to avoid segfault
-from utils import ConfigManager
+from utils import ConfigManager, resource_path
 from transcription import create_local_model
 
 _preloaded_model = None
@@ -84,7 +84,7 @@ class WhisperWriterApp(QObject):
         self.app = QApplication(sys.argv)
         self.app.setStyle('Fusion')
         self.app.setStyleSheet(GLOBAL_QSS)
-        self.app.setWindowIcon(QIcon(os.path.join('assets', 'ww-logo.png')))
+        self.app.setWindowIcon(QIcon(resource_path(os.path.join('assets', 'ww-logo.png'))))
 
         ConfigManager.initialize()
 
@@ -131,7 +131,7 @@ class WhisperWriterApp(QObject):
         """
         Create the system tray icon and its context menu.
         """
-        self.tray_icon = QSystemTrayIcon(QIcon(os.path.join('assets', 'ww-logo.png')), self.app)
+        self.tray_icon = QSystemTrayIcon(QIcon(resource_path(os.path.join('assets', 'ww-logo.png'))), self.app)
 
         tray_menu = QMenu()
 
@@ -242,9 +242,7 @@ class WhisperWriterApp(QObject):
     def _play_completion_beep(self):
         """Play the completion beep using sounddevice (already a dep, no extra install)."""
         try:
-            beep_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                    'assets', 'beep.wav')
-            data, sample_rate = sf.read(beep_path)
+            data, sample_rate = sf.read(resource_path(os.path.join('assets', 'beep.wav')))
             sd.play(data, sample_rate)
             sd.wait()
         except Exception as e:

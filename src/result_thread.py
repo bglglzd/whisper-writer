@@ -2,15 +2,34 @@ import time
 import traceback
 import numpy as np
 import sounddevice as sd
-import tempfile
-import wave
-import webrtcvad
 from PySide6.QtCore import QThread, QMutex, Signal
 from collections import deque
 from threading import Event
 
 from transcription import transcribe
 from utils import ConfigManager
+
+try:
+    import webrtcvad  # type: ignore
+    _HAS_WEBRTCVAD = True
+except ImportError:
+    _HAS_WEBRTCVAD = False
+
+
+def _frame_is_speech_rms(frame_int16, threshold=500):
+    """
+    Cheap, dependency-free silence detector: returns True if the RMS
+    amplitude of an int16 audio frame is above `threshold`.
+
+    Used as a fallback when `webrtcvad` is not available (e.g. in the
+    public CPU-only release where webrtcvad's PyInstaller hook is broken).
+    Slightly less robust at rejecting non-speech noise than WebRTC VAD,
+    but adequate for typical desktop microphone use.
+    """
+    if frame_int16.size == 0:
+        return False
+    rms = np.sqrt(np.mean(frame_int16.astype(np.float32) ** 2))
+    return rms > threshold
 
 
 class ResultThread(QThread):
@@ -123,8 +142,12 @@ class ResultThread(QThread):
         # Create VAD only for recording modes that use it
         recording_mode = recording_options.get('recording_mode') or 'continuous'
         vad = None
+        use_rms_fallback = False
         if recording_mode in ('voice_activity_detection', 'continuous'):
-            vad = webrtcvad.Vad(2)  # VAD aggressiveness: 0 to 3, 3 being the most aggressive
+            if _HAS_WEBRTCVAD:
+                vad = webrtcvad.Vad(2)  # VAD aggressiveness: 0 to 3, 3 being the most aggressive
+            else:
+                use_rms_fallback = True
             speech_detected = False
             silent_frame_count = 0
 
@@ -159,8 +182,12 @@ class ResultThread(QThread):
                     initial_frames_to_skip -= 1
                     continue
 
-                if vad:
-                    if vad.is_speech(frame.tobytes(), self.sample_rate):
+                if vad or use_rms_fallback:
+                    if vad:
+                        is_speech = vad.is_speech(frame.tobytes(), self.sample_rate)
+                    else:
+                        is_speech = _frame_is_speech_rms(frame)
+                    if is_speech:
                         silent_frame_count = 0
                         if not speech_detected:
                             ConfigManager.console_print("Speech detected.")
