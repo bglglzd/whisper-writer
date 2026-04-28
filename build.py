@@ -75,6 +75,7 @@ def run_pyinstaller():
         '--name', 'WhisperWriter',
         '--windowed',                 # no console window
         '--noconfirm',
+        '--uac-admin',                # request elevation on every launch
         '--icon', str(ROOT / 'assets' / 'ww-logo.ico'),
         '--add-data', f'{ROOT / "assets"}{sep}assets',
         '--add-data', f'{ROOT / "src" / "config_schema.yaml"}{sep}src',
