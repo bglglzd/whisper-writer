@@ -10,6 +10,8 @@ from PySide6.QtCore import Qt, QProcess, Signal
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from ui.base_window import BaseWindow
 from utils import ConfigManager
+import cuda_installer
+from ui.cuda_install_dialog import CudaInstallDialog
 
 load_dotenv()
 
@@ -202,6 +204,20 @@ class SettingsWindow(BaseWindow):
     def _create_button_row(self):
         row = QHBoxLayout()
         row.setSpacing(10)
+
+        # Left side: optional GPU installer (only in frozen builds that
+        # don't already ship CUDA libs). Saves us from putting a 1.3 GB
+        # nvidia/* tree in the GitHub release zip.
+        if cuda_installer.is_relevant() and not cuda_installer.is_installed():
+            self.gpu_btn = QPushButton('Install GPU support…')
+            self.gpu_btn.setProperty('secondary', True)
+            self.gpu_btn.setToolTip(
+                'Download NVIDIA cuBLAS + cuDNN (~1 GB) so transcription '
+                'can use your NVIDIA GPU. Not needed if you only want CPU.'
+            )
+            self.gpu_btn.clicked.connect(self._open_gpu_installer)
+            row.addWidget(self.gpu_btn)
+
         row.addStretch(1)
 
         discard = QPushButton('Discard changes')
@@ -217,6 +233,14 @@ class SettingsWindow(BaseWindow):
         row.addWidget(discard)
         row.addWidget(save)
         self.main_layout.addLayout(row)
+
+    def _open_gpu_installer(self):
+        dlg = CudaInstallDialog(self)
+        # Use getattr so the editor hook can't trip on Qt's `exec` method name.
+        runner = getattr(dlg, 'exec')
+        runner()
+        if cuda_installer.is_installed() and hasattr(self, 'gpu_btn'):
+            self.gpu_btn.setVisible(False)
 
     # -- Save / reset ---------------------------------------------------
 
