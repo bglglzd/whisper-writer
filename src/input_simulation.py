@@ -41,13 +41,22 @@ if _IS_WINDOWS:
     VK_CONTROL = 0x11
     VK_V = 0x56
 
+    # On 64-bit Windows, HANDLE / HGLOBAL / pointers are 8 bytes. Without an
+    # explicit `restype`, ctypes assumes `int` (4 bytes) and silently
+    # truncates the high 32 bits — every subsequent call using that handle
+    # fails. We declare argtypes/restype for every function we touch.
+    _ULONG_PTR = ctypes.c_size_t  # On Win64, ULONG_PTR is 8 bytes (size_t).
+
+    # ULONG_PTR-sized field used by KEYBDINPUT.dwExtraInfo etc.
+    _PVOID = ctypes.c_void_p
+
     class _KEYBDINPUT(ctypes.Structure):
         _fields_ = [
             ('wVk', wintypes.WORD),
             ('wScan', wintypes.WORD),
             ('dwFlags', wintypes.DWORD),
             ('time', wintypes.DWORD),
-            ('dwExtraInfo', ctypes.POINTER(wintypes.ULONG)),
+            ('dwExtraInfo', _ULONG_PTR),
         ]
 
     class _MOUSEINPUT(ctypes.Structure):
@@ -57,7 +66,7 @@ if _IS_WINDOWS:
             ('mouseData', wintypes.DWORD),
             ('dwFlags', wintypes.DWORD),
             ('time', wintypes.DWORD),
-            ('dwExtraInfo', ctypes.POINTER(wintypes.ULONG)),
+            ('dwExtraInfo', _ULONG_PTR),
         ]
 
     class _HARDWAREINPUT(ctypes.Structure):
@@ -80,6 +89,37 @@ if _IS_WINDOWS:
             ('i', _I),
         ]
 
+    # Clipboard
+    _user32.OpenClipboard.argtypes = [wintypes.HWND]
+    _user32.OpenClipboard.restype = wintypes.BOOL
+    _user32.EmptyClipboard.argtypes = []
+    _user32.EmptyClipboard.restype = wintypes.BOOL
+    _user32.SetClipboardData.argtypes = [wintypes.UINT, wintypes.HANDLE]
+    _user32.SetClipboardData.restype = wintypes.HANDLE
+    _user32.CloseClipboard.argtypes = []
+    _user32.CloseClipboard.restype = wintypes.BOOL
+
+    # Foreground window introspection
+    _user32.GetForegroundWindow.argtypes = []
+    _user32.GetForegroundWindow.restype = wintypes.HWND
+    _user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+    _user32.GetWindowTextW.restype = ctypes.c_int
+    _user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    _user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+
+    # Global memory (handles must be 8-byte HANDLEs on x64)
+    _kernel32.GlobalAlloc.argtypes = [wintypes.UINT, ctypes.c_size_t]
+    _kernel32.GlobalAlloc.restype = wintypes.HANDLE
+    _kernel32.GlobalLock.argtypes = [wintypes.HANDLE]
+    _kernel32.GlobalLock.restype = _PVOID
+    _kernel32.GlobalUnlock.argtypes = [wintypes.HANDLE]
+    _kernel32.GlobalUnlock.restype = wintypes.BOOL
+    _kernel32.GlobalFree.argtypes = [wintypes.HANDLE]
+    _kernel32.GlobalFree.restype = wintypes.HANDLE
+    _kernel32.GetLastError.argtypes = []
+    _kernel32.GetLastError.restype = wintypes.DWORD
+
+    # SendInput
     _user32.SendInput.argtypes = [wintypes.UINT, ctypes.POINTER(_INPUT), ctypes.c_int]
     _user32.SendInput.restype = wintypes.UINT
 
@@ -127,7 +167,7 @@ if _IS_WINDOWS:
         inputs[2].ki.dwFlags = KEYEVENTF_KEYUP
         inputs[3].ki.wVk = VK_CONTROL
         inputs[3].ki.dwFlags = KEYEVENTF_KEYUP
-        n = _user32.SendInput(4, ctypes.byref(inputs), ctypes.sizeof(_INPUT))
+        n = _user32.SendInput(4, ctypes.cast(inputs, ctypes.POINTER(_INPUT)), ctypes.sizeof(_INPUT))
         if n != 4:
             return False, f'SendInput sent {n}/4 events (GLE={_kernel32.GetLastError()})'
         return True, 'ok'
@@ -147,7 +187,7 @@ if _IS_WINDOWS:
             events[base + 1].ki.wVk = 0
             events[base + 1].ki.wScan = code
             events[base + 1].ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP
-        n = _user32.SendInput(len(events), ctypes.byref(events), ctypes.sizeof(_INPUT))
+        n = _user32.SendInput(len(events), ctypes.cast(events, ctypes.POINTER(_INPUT)), ctypes.sizeof(_INPUT))
         return n == len(events), f'SendInput sent {n}/{len(events)}'
 
 
