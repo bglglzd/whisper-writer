@@ -119,9 +119,24 @@ if _IS_WINDOWS:
     _kernel32.GetLastError.argtypes = []
     _kernel32.GetLastError.restype = wintypes.DWORD
 
-    # SendInput
-    _user32.SendInput.argtypes = [wintypes.UINT, ctypes.POINTER(_INPUT), ctypes.c_int]
-    _user32.SendInput.restype = wintypes.UINT
+    # SendInput — NOTE: do NOT set argtypes/restype here. ctypes caches
+    # function signatures on the singleton WinDLL handle, and pynput also
+    # calls user32.SendInput with its OWN _INPUT struct. Setting argtypes
+    # globally breaks pynput's call ("expected LP__INPUT instance instead
+    # of pointer to INPUT"). Our own calls below pass a properly-cast
+    # POINTER(_INPUT), so they work without argtypes too.
+
+    # MapVirtualKey for converting VK codes -> scan codes
+    _user32.MapVirtualKeyW.argtypes = [wintypes.UINT, wintypes.UINT]
+    _user32.MapVirtualKeyW.restype = wintypes.UINT
+
+    # Older keyboard injection API — sometimes bypasses keyboard hooks
+    # that block SendInput (some AVs / anti-cheat / RDP clients do this).
+    _user32.keybd_event.argtypes = [wintypes.BYTE, wintypes.BYTE, wintypes.DWORD, _ULONG_PTR]
+    _user32.keybd_event.restype = None
+
+    MAPVK_VK_TO_VSC = 0
+    KEYEVENTF_SCANCODE = 0x0008
 
     def _foreground_window_info():
         """Return a short string describing the foreground window for logging."""
@@ -158,19 +173,40 @@ if _IS_WINDOWS:
             _user32.CloseClipboard()
 
     def _win32_send_ctrl_v():
+        # Build events with BOTH VK and scan code populated. Hooks that
+        # filter by VK see the right keys; hooks that filter by scan code
+        # also see the right keys. Highest-compatibility shape.
+        sc_ctrl = _user32.MapVirtualKeyW(VK_CONTROL, MAPVK_VK_TO_VSC)
+        sc_v = _user32.MapVirtualKeyW(VK_V, MAPVK_VK_TO_VSC)
+
         inputs = (_INPUT * 4)()
         for i in range(4):
             inputs[i].type = INPUT_KEYBOARD
-        inputs[0].ki.wVk = VK_CONTROL
-        inputs[1].ki.wVk = VK_V
-        inputs[2].ki.wVk = VK_V
-        inputs[2].ki.dwFlags = KEYEVENTF_KEYUP
-        inputs[3].ki.wVk = VK_CONTROL
-        inputs[3].ki.dwFlags = KEYEVENTF_KEYUP
+        inputs[0].ki.wVk, inputs[0].ki.wScan, inputs[0].ki.dwFlags = VK_CONTROL, sc_ctrl, 0
+        inputs[1].ki.wVk, inputs[1].ki.wScan, inputs[1].ki.dwFlags = VK_V,       sc_v,    0
+        inputs[2].ki.wVk, inputs[2].ki.wScan, inputs[2].ki.dwFlags = VK_V,       sc_v,    KEYEVENTF_KEYUP
+        inputs[3].ki.wVk, inputs[3].ki.wScan, inputs[3].ki.dwFlags = VK_CONTROL, sc_ctrl, KEYEVENTF_KEYUP
         n = _user32.SendInput(4, ctypes.cast(inputs, ctypes.POINTER(_INPUT)), ctypes.sizeof(_INPUT))
-        if n != 4:
-            return False, f'SendInput sent {n}/4 events (GLE={_kernel32.GetLastError()})'
-        return True, 'ok'
+        if n == 4:
+            return True, 'ok'
+        return False, f'SendInput sent {n}/4 (GLE={_kernel32.GetLastError()})'
+
+    def _win32_send_ctrl_v_keybd_event():
+        # Older API. Some hooks that block WH_KEYBOARD_LL events from
+        # SendInput let keybd_event events through (or vice versa) — try
+        # both.
+        sc_ctrl = _user32.MapVirtualKeyW(VK_CONTROL, MAPVK_VK_TO_VSC)
+        sc_v = _user32.MapVirtualKeyW(VK_V, MAPVK_VK_TO_VSC)
+        try:
+            _user32.keybd_event(VK_CONTROL, sc_ctrl, 0, 0)
+            time.sleep(0.01)
+            _user32.keybd_event(VK_V,       sc_v,    0, 0)
+            time.sleep(0.02)
+            _user32.keybd_event(VK_V,       sc_v,    KEYEVENTF_KEYUP, 0)
+            _user32.keybd_event(VK_CONTROL, sc_ctrl, KEYEVENTF_KEYUP, 0)
+            return True, 'ok'
+        except Exception as e:
+            return False, f'keybd_event raised {e}'
 
     def _win32_send_unicode_text(text):
         """Last-resort fallback: send each character as a Unicode VK_PACKET event."""
@@ -212,9 +248,15 @@ class InputSimulator:
     # -- public ----------------------------------------------------------
 
     def typewrite(self, text):
+        """Send `text` to the focused window.
+
+        Returns True if a synthetic-input method succeeded, False if every
+        method was blocked (in which case the text is still on the
+        clipboard for the user to paste manually with Ctrl+V).
+        """
         if not text:
             ConfigManager.console_print('typewrite: empty text, nothing to do')
-            return
+            return True
         ConfigManager.console_print(f'typewrite: {len(text)} chars; method={self.input_method}; platform={sys.platform}')
         if _IS_WINDOWS:
             ConfigManager.console_print(f'typewrite: foreground {_foreground_window_info()}')
@@ -224,18 +266,26 @@ class InputSimulator:
         if self.input_method == 'pynput':
             if _IS_WINDOWS:
                 if self._typewrite_win32_paste(text):
-                    return
-                ConfigManager.console_print('typewrite: paste failed, falling back to Unicode SendInput')
+                    return True
+                ConfigManager.console_print('typewrite: SendInput Ctrl+V blocked, trying keybd_event')
+                if self._typewrite_keybd_event_paste():
+                    return True
+                ConfigManager.console_print('typewrite: keybd_event also blocked, trying Unicode SendInput')
                 if self._typewrite_win32_unicode(text):
-                    return
-                ConfigManager.console_print('typewrite: Unicode SendInput failed, falling back to pynput')
-                self._typewrite_pynput(text, interval)
+                    return True
+                ConfigManager.console_print('typewrite: all synthetic-input methods blocked')
+                ConfigManager.console_print('typewrite: text remains in clipboard — user must Ctrl+V manually')
+                return False
             else:
                 self._typewrite_pynput(text, interval)
+                return True
         elif self.input_method == 'ydotool':
             self._typewrite_ydotool(text, interval)
+            return True
         elif self.input_method == 'dotool':
             self._typewrite_dotool(text, interval)
+            return True
+        return False
 
     def cleanup(self):
         if self.input_method == 'dotool':
@@ -257,6 +307,18 @@ class InputSimulator:
             ConfigManager.console_print(f'typewrite: SendInput Ctrl+V FAILED ({why})')
             return False
         ConfigManager.console_print('typewrite: SendInput Ctrl+V OK')
+        return True
+
+    def _typewrite_keybd_event_paste(self):
+        """Try the older keybd_event API for Ctrl+V. The clipboard is
+        already populated by `_typewrite_win32_paste` — we just retry
+        sending the keystrokes. Some keyboard hooks block SendInput but
+        let keybd_event through (or vice versa)."""
+        ok, why = _win32_send_ctrl_v_keybd_event()
+        if not ok:
+            ConfigManager.console_print(f'typewrite: keybd_event Ctrl+V FAILED ({why})')
+            return False
+        ConfigManager.console_print('typewrite: keybd_event Ctrl+V OK')
         return True
 
     def _typewrite_win32_unicode(self, text):
