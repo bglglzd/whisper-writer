@@ -8,14 +8,30 @@ from openai import OpenAI
 
 from utils import ConfigManager
 
-# When packaged with PyInstaller (`sys._MEIPASS` is set), the bundle ships
-# without NVIDIA CUDA DLLs (cublas, cudnn, …). ctranslate2 will happily
-# *create* a CUDA model in that environment but then crash at the first
-# inference call with "Library cublas64_12.dll is not found". So in a
-# frozen build we ignore the user's `device`/`compute_type` config and
-# force a safe CPU configuration. Source-checkout users with a working
-# CUDA install are unaffected.
-_FROZEN_CPU_ONLY = hasattr(sys, '_MEIPASS')
+
+def _frozen_has_cuda_libs():
+    """
+    Returns True when running from a PyInstaller bundle that *does* include
+    the NVIDIA CUDA DLLs (cublas + cudnn). The CPU-only release strips
+    them; the CUDA release bundles them under `_internal/nvidia/`.
+
+    ctranslate2 fails *at inference time*, not at model creation, when
+    cuBLAS isn't loadable — so we can't just `try` model creation. Probe
+    the filesystem instead.
+    """
+    if not hasattr(sys, '_MEIPASS'):
+        return False
+    candidates = [
+        os.path.join(sys._MEIPASS, 'nvidia', 'cublas', 'bin', 'cublas64_12.dll'),
+        os.path.join(os.path.dirname(sys.executable), '_internal', 'nvidia', 'cublas', 'bin', 'cublas64_12.dll'),
+    ]
+    return any(os.path.isfile(p) for p in candidates)
+
+
+# Force CPU only when frozen *and* CUDA libs are absent (the CPU-only build).
+# Frozen + CUDA libs present → honor user config (device=auto/cuda/cpu).
+# Source mode → always honor user config (their venv has its own CUDA libs).
+_FROZEN_CPU_ONLY = hasattr(sys, '_MEIPASS') and not _frozen_has_cuda_libs()
 
 _openai_client = None
 _openai_client_key = None

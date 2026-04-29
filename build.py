@@ -1,14 +1,20 @@
 """
 Build a portable Windows release of WhisperWriter.
 
-CPU-only: NVIDIA CUDA libs are excluded so the bundle stays small (~200-300 MB
-zipped) and works on any Windows machine. Users with NVIDIA GPUs who want
-CUDA acceleration should run from source instead.
+Two targets:
+    build.py            -> CPU-only bundle (~140 MB zipped). Works on any
+                           Windows machine, slow transcription.
+    build.py --cuda     -> CUDA-enabled bundle (~700 MB zipped, ~1.5 GB
+                           unpacked). Bundles cuBLAS + cuDNN. NVIDIA users
+                           get GPU acceleration; non-NVIDIA users still
+                           work via the runtime CPU fallback in
+                           transcription.create_local_model.
 
-Output: dist/WhisperWriter/  (a folder containing WhisperWriter.exe + deps)
+Output: dist/WhisperWriter/                        (folder)
+        dist/WhisperWriter-Windows-{CPU,CUDA}.zip  (release artifact)
 
 Usage:
-    venv/Scripts/python.exe build.py
+    venv/Scripts/python.exe build.py [--cuda]
 """
 import os
 import shutil
@@ -68,7 +74,7 @@ def clean():
         SPEC.unlink()
 
 
-def run_pyinstaller():
+def run_pyinstaller(include_cuda=False):
     sep = ';'  # Windows path-separator for --add-data
     cmd = [
         sys.executable, '-m', 'PyInstaller',
@@ -85,9 +91,17 @@ def run_pyinstaller():
     ]
     for mod in EXCLUDES:
         cmd += ['--exclude-module', mod]
+    if include_cuda:
+        # Pull in the cuBLAS / cuDNN data files (DLLs) that ctranslate2
+        # needs at inference time. PyInstaller's import-following does not
+        # discover these because ctranslate2 dlopen()s them at runtime.
+        cmd += ['--collect-all', 'nvidia.cublas']
+        cmd += ['--collect-all', 'nvidia.cudnn']
+    else:
+        cmd += ['--exclude-module', 'nvidia']
     cmd.append(str(ROOT / 'src' / 'main.py'))
 
-    print('Running PyInstaller ...')
+    print(f'Running PyInstaller (cuda={include_cuda}) ...')
     subprocess.run(cmd, check=True, cwd=ROOT)
 
 
@@ -116,12 +130,13 @@ def strip_cuda_libs():
             f.unlink()
 
 
-def make_zip():
+def make_zip(target):
     out_dir = DIST / 'WhisperWriter'
     if not out_dir.exists():
         raise RuntimeError(f'{out_dir} not found — PyInstaller failed?')
 
-    zip_path = DIST / 'WhisperWriter-Windows-CPU.zip'
+    suffix = 'CUDA' if target == 'cuda' else 'CPU'
+    zip_path = DIST / f'WhisperWriter-Windows-{suffix}.zip'
     if zip_path.exists():
         zip_path.unlink()
 
@@ -135,10 +150,13 @@ def make_zip():
 
 
 def main():
+    target = 'cuda' if '--cuda' in sys.argv else 'cpu'
+    print(f'=== Build target: {target} ===')
     clean()
-    run_pyinstaller()
-    strip_cuda_libs()
-    make_zip()
+    run_pyinstaller(include_cuda=(target == 'cuda'))
+    if target == 'cpu':
+        strip_cuda_libs()
+    make_zip(target)
 
 
 if __name__ == '__main__':
