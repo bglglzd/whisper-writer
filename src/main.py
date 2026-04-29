@@ -400,7 +400,21 @@ class WhisperWriterApp(QObject):
         """
         When the transcription is complete, type the result and start listening for the activation key again.
         """
-        self.input_simulator.typewrite(result)
+        injected = self.input_simulator.typewrite(result)
+        if not injected and result:
+            # Every synthetic-input path was blocked (security software with
+            # a low-level keyboard hook, etc.). The text is still on the
+            # clipboard — tell the user via a tray balloon so they know
+            # to paste manually with Ctrl+V.
+            try:
+                self.tray_icon.showMessage(
+                    'WhisperWriter — text copied',
+                    'Synthetic input blocked. Press Ctrl+V to paste.',
+                    QSystemTrayIcon.Information,
+                    4000,
+                )
+            except Exception:
+                pass
 
         if ConfigManager.get_config_value('misc', 'noise_on_completion'):
             self._play_completion_beep()
