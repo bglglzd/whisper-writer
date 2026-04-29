@@ -17,16 +17,24 @@ try:
 except Exception:
     pass
 
-# Add NVIDIA CUDA DLLs to PATH and DLL directories before any CUDA imports
+# Add NVIDIA CUDA DLL directories to PATH and DLL search directories before
+# any CUDA imports. We check three locations:
+#   - sys._MEIPASS / nvidia / ...        (frozen CUDA bundle)
+#   - sys.prefix / Lib / site-packages   (system / venv install)
+#   - <project root>/venv/Lib/site-packages   (source mode)
 _project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-for nvidia_lib in ['nvidia\\cublas\\bin', 'nvidia\\cudnn\\bin']:
-    for base in [os.path.join(sys.prefix, 'Lib', 'site-packages'),
-                 os.path.join(_project_root, 'venv', 'Lib', 'site-packages')]:
-        dll_path = os.path.abspath(os.path.join(base, nvidia_lib))
-        if os.path.isdir(dll_path):
-            os.environ['PATH'] = dll_path + os.pathsep + os.environ.get('PATH', '')
+_cuda_search_bases = []
+if hasattr(sys, '_MEIPASS'):
+    _cuda_search_bases.append(sys._MEIPASS)
+_cuda_search_bases.append(os.path.join(sys.prefix, 'Lib', 'site-packages'))
+_cuda_search_bases.append(os.path.join(_project_root, 'venv', 'Lib', 'site-packages'))
+for _base in _cuda_search_bases:
+    for _nvidia_sub in ('nvidia\\cublas\\bin', 'nvidia\\cudnn\\bin'):
+        _dll_path = os.path.abspath(os.path.join(_base, _nvidia_sub))
+        if os.path.isdir(_dll_path):
+            os.environ['PATH'] = _dll_path + os.pathsep + os.environ.get('PATH', '')
             if hasattr(os, 'add_dll_directory'):
-                os.add_dll_directory(dll_path)
+                os.add_dll_directory(_dll_path)
 
 # IMPORTANT: Load CUDA model BEFORE importing Qt to avoid segfault
 from utils import ConfigManager, resource_path
